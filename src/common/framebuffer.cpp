@@ -1,4 +1,5 @@
 #include "framebuffer.hpp"
+#include <vector>
 
 Framebuffer::Framebuffer(Texture2D **color_attachments,
                          uint32_t color_attachment_count,
@@ -16,12 +17,20 @@ void Framebuffer::init(Texture2D **color_attachments,
   glGenFramebuffers(1, &_id);
   glBindFramebuffer(GL_FRAMEBUFFER, _id);
 
+  // 设置 draw buffers 数组
+  std::vector<GLenum> drawBuffers;
   for (uint32_t i = 0; i < color_attachment_count; i++) {
     glFramebufferTexture2D(GL_FRAMEBUFFER,
                            GL_COLOR_ATTACHMENT0 + i,
                            GL_TEXTURE_2D,
                            color_attachments[i]->get(),
                            0);
+    drawBuffers.push_back(GL_COLOR_ATTACHMENT0 + i);
+  }
+
+  // 告诉 OpenGL 使用哪些 color attachments
+  if (!drawBuffers.empty()) {
+    glDrawBuffers(static_cast<GLsizei>(drawBuffers.size()), drawBuffers.data());
   }
 
   if (depth_stencil_attachment != nullptr) {

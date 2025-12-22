@@ -47,7 +47,10 @@ void Texture2D::init(uint8_t *data,
                format,
                data_type,
                data);
-  glGenerateMipmap(GL_TEXTURE_2D);
+  // 只对非 depth/stencil 格式生成 mipmap
+  if (format != GL_DEPTH_COMPONENT && format != GL_DEPTH_STENCIL) {
+    glGenerateMipmap(GL_TEXTURE_2D);
+  }
 }
 
 void Texture2D::init(uint8_t *data,

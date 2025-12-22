@@ -1,0 +1,128 @@
+#version 430 core
+
+#define LOCAL_GROUP_SIZE 16
+#define MAX_VPL_NUM 128
+
+layout(local_size_x = LOCAL_GROUP_SIZE, local_size_y = LOCAL_GROUP_SIZE) in;
+
+layout(rgba32f, binding = 0) uniform writeonly image2D uOutputImage;
+
+// G-Buffer textures (from camera view)
+uniform sampler2D uAlbedoTexture;
+uniform sampler2D uNormalTexture;
+uniform sampler2D uPositionTexture;
+
+// RSM textures (from light view, but stored in camera view space)
+uniform sampler2D uRSMFluxTexture;
+uniform sampler2D uRSMNormalTexture;
+uniform sampler2D uRSMPositionTexture;
+
+// Uniforms
+uniform mat4 uLightVPMulInvCameraView;  // LightVP * inverse(CameraView)
+uniform vec3 uLightDirViewSpace;         // Light direction in camera view space
+uniform vec3 uLightColor;
+uniform int uRSMResolution;
+uniform int uVPLNum;
+uniform float uMaxSampleRadius;
+uniform float uIndirectStrength;
+
+// VPL sample coords and weights (precomputed on CPU)
+layout(std140, binding = 1) uniform VPLSamples {
+    vec4 uVPLSampleCoordsAndWeights[MAX_VPL_NUM];
+};
+
+// Calculate irradiance from a single VPL
+vec3 calcVPLIrradiance(vec3 vplFlux, vec3 vplNormal, vec3 vplPos, 
+                       vec3 fragPos, vec3 fragNormal, float weight) {
+    vec3 vpl2frag = fragPos - vplPos;
+    float dist2 = dot(vpl2frag, vpl2frag);
+    
+    // Avoid division by zero and reduce noise from very close VPLs
+    if (dist2 < 0.0001) return vec3(0.0);
+    
+    vec3 vpl2fragDir = normalize(vpl2frag);
+    
+    // VPL emission direction (cosine of angle between VPL normal and direction to fragment)
+    float cosVPL = max(dot(vplNormal, vpl2fragDir), 0.0);
+    
+    // Fragment receiving (cosine of angle between fragment normal and direction from VPL)
+    float cosFrag = max(dot(fragNormal, -vpl2fragDir), 0.0);
+    
+    // Irradiance with distance attenuation (simplified, not using ||x-x_p||^4 from paper)
+    return vplFlux * cosVPL * cosFrag * weight / (dist2 + 1.0);
+}
+
+void main() {
+    ivec2 fragCoord = ivec2(gl_GlobalInvocationID.xy);
+    ivec2 imageSize = imageSize(uOutputImage);
+    
+    if (fragCoord.x >= imageSize.x || fragCoord.y >= imageSize.y) {
+        return;
+    }
+    
+    // Sample G-Buffer
+    vec3 fragNormal = normalize(texelFetch(uNormalTexture, fragCoord, 0).xyz);
+    vec3 fragAlbedo = texelFetch(uAlbedoTexture, fragCoord, 0).xyz;
+    vec3 fragPos = texelFetch(uPositionTexture, fragCoord, 0).xyz;
+    
+    // Check if this is a valid fragment (not background)
+    if (length(fragNormal) < 0.5) {
+        imageStore(uOutputImage, fragCoord, vec4(0.0, 0.0, 0.0, 1.0));
+        return;
+    }
+    
+    // Transform fragment position to light NDC space
+    vec4 fragPosLightSpace = uLightVPMulInvCameraView * vec4(fragPos, 1.0);
+    fragPosLightSpace /= fragPosLightSpace.w;
+    vec2 fragNDCPosLight = (fragPosLightSpace.xy + 1.0) * 0.5;
+    
+    float rsmTexelSize = 1.0 / float(uRSMResolution);
+    
+    // Calculate direct illumination
+    vec3 directIllumination;
+    bool inShadow = fragPosLightSpace.z < 0.0 || 
+                    fragNDCPosLight.x < 0.0 || fragNDCPosLight.x > 1.0 ||
+                    fragNDCPosLight.y < 0.0 || fragNDCPosLight.y > 1.0;
+    
+    if (inShadow) {
+        // Simple ambient for shadowed areas
+        directIllumination = vec3(0.1) * fragAlbedo;
+    } else {
+        // Lambertian direct lighting
+        float NdotL = max(dot(fragNormal, -uLightDirViewSpace), 0.0);
+        directIllumination = fragAlbedo * uLightColor * max(NdotL, 0.1);
+    }
+    
+    // Calculate indirect illumination by sampling VPLs from RSM
+    vec3 indirectIllumination = vec3(0.0);
+    
+    int actualVPLNum = min(uVPLNum, MAX_VPL_NUM);
+    for (int i = 0; i < actualVPLNum; ++i) {
+        vec3 sampleCoordAndWeight = uVPLSampleCoordsAndWeights[i].xyz;
+        
+        // Sample position in RSM (around the projected fragment position)
+        vec2 vplSamplePos = fragNDCPosLight + uMaxSampleRadius * sampleCoordAndWeight.xy * rsmTexelSize;
+        
+        // Clamp to valid range
+        vplSamplePos = clamp(vplSamplePos, vec2(0.0), vec2(1.0));
+        
+        // Sample RSM data
+        vec3 vplFlux = texture(uRSMFluxTexture, vplSamplePos).xyz;
+        vec3 vplNormal = normalize(texture(uRSMNormalTexture, vplSamplePos).xyz);
+        vec3 vplPosition = texture(uRSMPositionTexture, vplSamplePos).xyz;
+        
+        // Accumulate indirect illumination
+        indirectIllumination += calcVPLIrradiance(
+            vplFlux, vplNormal, vplPosition,
+            fragPos, fragNormal, sampleCoordAndWeight.z
+        );
+    }
+    
+    // Apply albedo to indirect illumination and normalize
+    indirectIllumination *= fragAlbedo * uIndirectStrength / float(actualVPLNum);
+    
+    // Combine direct and indirect illumination
+    vec3 result = directIllumination + indirectIllumination;
+    
+    imageStore(uOutputImage, fragCoord, vec4(result, 1.0));
+}
