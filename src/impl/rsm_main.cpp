@@ -72,10 +72,16 @@ private:
     float _lightPitch = 60.0f;
     
     // RSM 参数
+    bool _enableRSM = true;  // RSM 开关
     int _vplNum = 64;
     float _maxSampleRadius = 25.0f;
     float _indirectStrength = 5.0f;
     int _displayMode = 0;
+    
+    // Shadow Map (用于普通阴影模式)
+    std::unique_ptr<Texture2D> _shadowMapTexture;
+    std::unique_ptr<Framebuffer> _shadowMapFBO;
+    static constexpr int SHADOW_MAP_SIZE = 1024;
     
     // 窗口尺寸
     int _width = 1024;
@@ -357,6 +363,11 @@ private:
         glBindTexture(GL_TEXTURE_2D, _rsmPosition->get());
         setUniformInt(prog, "uRSMPositionTexture", 5);
         
+        // 绑定 Shadow Map (使用 RSM depth)
+        glActiveTexture(GL_TEXTURE6);
+        glBindTexture(GL_TEXTURE_2D, _rsmDepth->get());
+        setUniformInt(prog, "uShadowMap", 6);
+        
         // 设置 uniforms
         glm::mat4 invView = glm::inverse(view);
         setUniformMat4(prog, "uLightVPMulInvCameraView", lightVP * invView);
@@ -366,6 +377,7 @@ private:
         setUniformInt(prog, "uVPLNum", _vplNum);
         setUniformFloat(prog, "uMaxSampleRadius", _maxSampleRadius);
         setUniformFloat(prog, "uIndirectStrength", _indirectStrength);
+        setUniformBool(prog, "uEnableRSM", _enableRSM);  // RSM 开关
         
         // 传递 VPL 采样数据
         setUniformVec4Array(prog, "uVPLSamples", _vplSamples.data(), MAX_VPL_NUM);
@@ -436,10 +448,22 @@ private:
             ImGui::PopID();
         }
         
+        if (ImGui::CollapsingHeader("Rendering Mode", ImGuiTreeNodeFlags_DefaultOpen)) {
+            ImGui::Checkbox("Enable RSM (Indirect Lighting)", &_enableRSM);
+            if (_enableRSM) {
+                ImGui::Text("Mode: RSM (Direct + Indirect Light)");
+            } else {
+                ImGui::Text("Mode: Shadow Mapping (Direct Light Only)");
+            }
+        }
+        
         if (ImGui::CollapsingHeader("RSM Parameters", ImGuiTreeNodeFlags_DefaultOpen)) {
             ImGui::SliderInt("VPL Count", &_vplNum, 8, MAX_VPL_NUM);
             ImGui::SliderFloat("Sample Radius", &_maxSampleRadius, 5.0f, 100.0f);
             ImGui::SliderFloat("Indirect Strength", &_indirectStrength, 0.1f, 20.0f);
+            if (!_enableRSM) {
+                ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.0f, 1.0f), "(RSM disabled - params inactive)");
+            }
         }
         
         if (ImGui::CollapsingHeader("Debug")) {

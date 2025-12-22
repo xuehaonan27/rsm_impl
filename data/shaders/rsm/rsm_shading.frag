@@ -23,6 +23,10 @@ uniform int uRSMResolution;
 uniform int uVPLNum;
 uniform float uMaxSampleRadius;
 uniform float uIndirectStrength;
+uniform bool uEnableRSM;  // RSM 开关
+
+// Shadow map for traditional shadow mapping
+uniform sampler2D uShadowMap;
 
 // VPL sample positions (passed via uniform array)
 #define MAX_VPL_NUM 128
@@ -85,6 +89,40 @@ vec3 calculateIndirectIllumination(vec3 fragPos, vec3 fragNormal) {
     return indirectIllum * uIndirectStrength / float(uVPLNum);
 }
 
+// Calculate shadow factor using RSM position (simplified shadow mapping)
+float calculateShadow(vec3 fragPos) {
+    vec4 fragPosLightClip = uLightVPMulInvCameraView * vec4(fragPos, 1.0);
+    vec3 fragPosLightNDC = fragPosLightClip.xyz / fragPosLightClip.w;
+    vec2 shadowCoord = fragPosLightNDC.xy * 0.5 + 0.5;
+    
+    // 边界检查
+    if (shadowCoord.x < 0.0 || shadowCoord.x > 1.0 ||
+        shadowCoord.y < 0.0 || shadowCoord.y > 1.0) {
+        return 1.0; // 在阴影贴图范围外，不在阴影中
+    }
+    
+    // 使用 RSM Position 来做阴影判断
+    // 采样 RSM 中最近可见点的位置（相机视空间）
+    vec3 rsmPos = texture(uRSMPositionTexture, shadowCoord).rgb;
+    
+    // 如果 RSM 中该点是空的（没有几何体），不在阴影中
+    if (length(rsmPos) < 0.01) {
+        return 1.0;
+    }
+    
+    // 比较当前片元到光源的距离与 RSM 记录的距离
+    // 两者都在相机视空间，需要转换到光源空间做距离比较
+    vec4 rsmPosLightClip = uLightVPMulInvCameraView * vec4(rsmPos, 1.0);
+    float rsmDepth = rsmPosLightClip.z / rsmPosLightClip.w;
+    float fragDepth = fragPosLightNDC.z;
+    
+    // 阴影偏移
+    float bias = 0.02;
+    float shadow = fragDepth - bias > rsmDepth ? 0.0 : 1.0;
+    
+    return shadow;
+}
+
 void main() {
     // Sample G-Buffer
     vec3 albedo = texture(uAlbedoTexture, vTexCoord).rgb;
@@ -103,14 +141,20 @@ void main() {
     float NdotL = max(dot(normal, -uLightDirViewSpace), 0.0);
     vec3 directLight = albedo * uLightColor * NdotL;
     
-    // Indirect lighting from RSM
-    vec3 indirectLight = calculateIndirectIllumination(position, normal) * albedo;
-    
     // Ambient term
     vec3 ambient = albedo * 0.03;
     
-    // Final color
-    vec3 finalColor = directLight + indirectLight + ambient;
+    vec3 finalColor;
+    
+    if (uEnableRSM) {
+        // RSM 模式：直接光 + 间接光 + 环境光
+        vec3 indirectLight = calculateIndirectIllumination(position, normal) * albedo;
+        finalColor = directLight + indirectLight + ambient;
+    } else {
+        // 普通 Shadow Mapping 模式：直接光 * 阴影因子 + 环境光
+        float shadow = calculateShadow(position);
+        finalColor = directLight * shadow + ambient;
+    }
     
     FragColor = vec4(finalColor, 1.0);
 }
