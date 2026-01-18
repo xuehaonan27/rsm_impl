@@ -25,6 +25,9 @@ uniform float uMaxSampleRadius;
 uniform float uIndirectStrength;
 uniform bool uEnableRSM;  // RSM 开关
 
+uniform mat4 uInvView;
+uniform vec3 uLightDirWorld;
+
 // Shadow map for traditional shadow mapping
 uniform sampler2D uShadowMap;
 
@@ -92,35 +95,28 @@ vec3 calculateIndirectIllumination(vec3 fragPos, vec3 fragNormal) {
 // Calculate shadow factor using RSM position (simplified shadow mapping)
 float calculateShadow(vec3 fragPos) {
     vec4 fragPosLightClip = uLightVPMulInvCameraView * vec4(fragPos, 1.0);
-    vec3 fragPosLightNDC = fragPosLightClip.xyz / fragPosLightClip.w;
-    vec2 shadowCoord = fragPosLightNDC.xy * 0.5 + 0.5;
     
-    // 边界检查
-    if (shadowCoord.x < 0.0 || shadowCoord.x > 1.0 ||
-        shadowCoord.y < 0.0 || shadowCoord.y > 1.0) {
-        return 1.0; // 在阴影贴图范围外，不在阴影中
-    }
+    // Check if in front of light
+    if (fragPosLightClip.w <= 0.0) return 1.0;
     
-    // 使用 RSM Position 来做阴影判断
-    // 采样 RSM 中最近可见点的位置（相机视空间）
-    vec3 rsmPos = texture(uRSMPositionTexture, shadowCoord).rgb;
+    vec3 ndc = fragPosLightClip.xyz / fragPosLightClip.w;
     
-    // 如果 RSM 中该点是空的（没有几何体），不在阴影中
-    if (length(rsmPos) < 0.01) {
+    // Check if in light frustum
+    if (ndc.x < -1.0 || ndc.x > 1.0 ||
+        ndc.y < -1.0 || ndc.y > 1.0 ||
+        ndc.z < 0.0 || ndc.z > 1.0) {
         return 1.0;
     }
     
-    // 比较当前片元到光源的距离与 RSM 记录的距离
-    // 两者都在相机视空间，需要转换到光源空间做距离比较
-    vec4 rsmPosLightClip = uLightVPMulInvCameraView * vec4(rsmPos, 1.0);
-    float rsmDepth = rsmPosLightClip.z / rsmPosLightClip.w;
-    float fragDepth = fragPosLightNDC.z;
+    vec2 uv = ndc.xy * 0.5 + 0.5;
+    float fragDepth = ndc.z; // OpenGL NDC z is [0,1] for ortho projection!
     
-    // 阴影偏移
-    float bias = 0.02;
-    float shadow = fragDepth - bias > rsmDepth ? 0.0 : 1.0;
+    float shadowMapDepth = texture(uShadowMap, uv).r;
     
-    return shadow;
+    float bias = 0.005;
+    float distanceBias = fragDepth * 0.0005;
+    bias = bias + distanceBias;
+    return (fragDepth - bias) > shadowMapDepth ? 0.0 : 1.0;
 }
 
 void main() {
@@ -142,13 +138,15 @@ void main() {
     vec3 directLight = albedo * uLightColor * NdotL;
     
     // Ambient term
-    vec3 ambient = albedo * 0.03;
+    vec3 ambient = albedo * 0.1;
+
     
     vec3 finalColor;
     
     if (uEnableRSM) {
         // RSM 模式：直接光 + 间接光 + 环境光
         vec3 indirectLight = calculateIndirectIllumination(position, normal) * albedo;
+        indirectLight*=100.0;
         finalColor = directLight + indirectLight + ambient;
     } else {
         // 普通 Shadow Mapping 模式：直接光 * 阴影因子 + 环境光

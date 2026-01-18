@@ -4,7 +4,7 @@ endif ()
 
 project (glew C)
 
-cmake_minimum_required (VERSION 2.8.12)
+cmake_minimum_required (VERSION 3.5)
 
 include(GNUInstallDirs)
 
@@ -99,7 +99,7 @@ include_directories (${GLEW_DIR}/include ${X11_INCLUDE_DIR})
 set (GLEW_PUBLIC_HEADERS_FILES ${GLEW_DIR}/include/GL/wglew.h ${GLEW_DIR}/include/GL/glew.h ${GLEW_DIR}/include/GL/glxew.h)
 set (GLEW_SRC_FILES ${GLEW_DIR}/src/glew.c)
 
-if (WIN32)
+if (WIN32 AND MSVC)
   list (APPEND GLEW_SRC_FILES ${GLEW_DIR}/build/glew.rc)
 endif ()
 

@@ -12,6 +12,7 @@ uniform sampler2D uDiffuseTexture;
 uniform vec3 uDiffuseColor;
 uniform bool uHasTexture;
 uniform vec3 uLightColor;
+uniform vec3 uLightDirViewSpace;
 
 void main() {
     vec3 texelColor;
@@ -23,7 +24,8 @@ void main() {
     
     // Flux = Light color * surface reflectance
     // This represents the reflected radiant flux from this VPL
-    vec3 vplFlux = uLightColor * texelColor;
+    float NdotL=max(0.0,dot(normalize(vNormalViewSpace),-uLightDirViewSpace));
+    vec3 vplFlux = uLightColor * texelColor*NdotL;
     
     gFlux = vplFlux;
     gNormal = normalize(vNormalViewSpace);

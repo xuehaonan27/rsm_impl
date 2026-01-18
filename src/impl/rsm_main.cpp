@@ -21,9 +21,12 @@ public:
     RSMApp() : Application("RSM - Reflective Shadow Maps", 1024, 768) {}
 
 private:
+    //窗口
+    int _currentWidth = 1024;
+    int _currentHeight = 768;
     // 分辨率设置
-    static constexpr int RSM_SIZE = 256;
-    static constexpr int MAX_VPL_NUM = 128;
+    static constexpr int RSM_SIZE = 2048;
+    static constexpr int MAX_VPL_NUM = 512;
     
     // 着色器程序
     std::unique_ptr<Program> _gbufferProgram;
@@ -60,16 +63,16 @@ private:
     std::vector<glm::vec4> _vplSamples;
     
     // 相机参数（独立于 ModelViewerCamera）
-    float _cameraYaw = 90.0f;
-    float _cameraPitch = 20.0f;
-    float _cameraDistance = 500.0f;
+    float _cameraYaw = 180.0f;
+    float _cameraPitch = 0.0f;
+    float _cameraDistance = 1.0f;
     glm::vec3 _cameraTarget = glm::vec3(0.0f, 100.0f, 0.0f);
     
     // 光源参数
     glm::vec3 _lightDir = glm::normalize(glm::vec3(-1.0f, -1.0f, -1.0f));
     glm::vec3 _lightColor = glm::vec3(1.0f, 0.95f, 0.9f);
     float _lightYaw = 45.0f;
-    float _lightPitch = 60.0f;
+    float _lightPitch = 45.0f;
     
     // RSM 参数
     bool _enableRSM = true;  // RSM 开关
@@ -89,8 +92,9 @@ private:
 
     void init() override {
         // 获取窗口尺寸
-        glfwGetFramebufferSize(_window, &_width, &_height);
-        
+        glfwGetFramebufferSize(_window, &_currentWidth, &_currentHeight);
+        _width = _currentWidth;
+        _height = _currentHeight;    
         // 加载场景
         loadScene();
         
@@ -118,6 +122,8 @@ private:
         // 根据场景设置相机初始位置
         _cameraTarget = _scene->getCenter();
         _cameraDistance = _scene->getRadius() * 1.5f;
+        _cameraYaw=90.0f;
+        _cameraPitch=10.0f;
     }
     
     void createShaders() {
@@ -299,7 +305,7 @@ private:
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
     }
     
-    void rsmBufferPass(const glm::mat4& view, const glm::mat4& lightVP) {
+    void rsmBufferPass(const glm::mat4& lightview, const glm::mat4& lightVP) {
         glBindFramebuffer(GL_FRAMEBUFFER, _rsmFBO->get());
         glViewport(0, 0, RSM_SIZE, RSM_SIZE);
         glClearColor(0, 0, 0, 1);
@@ -309,9 +315,12 @@ private:
         GLuint prog = _rsmBufferProgram->get();
         glUseProgram(prog);
         setUniformMat4(prog, "uModel", glm::mat4(1.0f));
-        setUniformMat4(prog, "uView", view);
+        setUniformMat4(prog, "uView", lightview);
         setUniformMat4(prog, "uLightVP", lightVP);
         setUniformVec3(prog, "uLightColor", _lightColor);
+
+        glm::vec3 lightDirInView = glm::vec3(lightview * glm::vec4(_lightDir, 0.0f));
+        setUniformVec3(prog, "uLightDirViewSpace", lightDirInView);
         
         for (size_t i = 0; i < _scene->getMeshes().size(); ++i) {
             auto& mesh = _scene->getMeshes()[i];
@@ -370,6 +379,8 @@ private:
         
         // 设置 uniforms
         glm::mat4 invView = glm::inverse(view);
+        setUniformMat4(prog,"uInView",invView);
+        setUniformVec3(prog,"uLightDirWorld",_lightDir);
         setUniformMat4(prog, "uLightVPMulInvCameraView", lightVP * invView);
         setUniformVec3(prog, "uLightDirViewSpace", glm::vec3(view * glm::vec4(_lightDir, 0.0f)));
         setUniformVec3(prog, "uLightColor", _lightColor);
@@ -443,7 +454,7 @@ private:
             ImGui::PushID("Camera");
             ImGui::SliderFloat("Yaw##C", &_cameraYaw, 0.0f, 360.0f);
             ImGui::SliderFloat("Pitch##C", &_cameraPitch, -89.0f, 89.0f);
-            ImGui::SliderFloat("Distance##C", &_cameraDistance, 1.0f, 5000.0f);
+            ImGui::SliderFloat("Distance##C", &_cameraDistance, 0.1f, 50.0f);
             ImGui::DragFloat3("Target##C", &_cameraTarget.x, 0.1f);
             ImGui::PopID();
         }
@@ -472,19 +483,82 @@ private:
             ImGui::Combo("Display", &_displayMode, modes, 7);
         }
     }
+
+    void recreateGBuffer() {
+        // 释放旧资源
+        _gbufferAlbedo.reset();
+        _gbufferNormal.reset();
+        _gbufferPosition.reset();
+        _gbufferDepth.reset();
+        _gbufferFBO.reset();
+        
+        _outputTexture.reset();
+        _outputDepth.reset();
+        _outputFBO.reset();
+        
+        // 重新创建 G-Buffer
+        _gbufferAlbedo = std::make_unique<Texture2D>(
+            nullptr, GL_FLOAT, _currentWidth, _currentHeight, GL_RGB16F, GL_RGB);
+        _gbufferNormal = std::make_unique<Texture2D>(
+            nullptr, GL_FLOAT, _currentWidth, _currentHeight, GL_RGB16F, GL_RGB);
+        _gbufferPosition = std::make_unique<Texture2D>(
+            nullptr, GL_FLOAT, _currentWidth, _currentHeight, GL_RGB32F, GL_RGB);
+        _gbufferDepth = std::make_unique<Texture2D>(
+            nullptr, GL_UNSIGNED_INT_24_8, _currentWidth, _currentHeight, GL_DEPTH24_STENCIL8, GL_DEPTH_STENCIL);
+        
+        Texture2D* gbufferColorAttachments[] = {
+            _gbufferAlbedo.get(), _gbufferNormal.get(), _gbufferPosition.get()
+        };
+        _gbufferFBO = std::make_unique<Framebuffer>(
+            gbufferColorAttachments, 3, _gbufferDepth.get());
+        
+        // 重新创建 Output FBO
+        _outputTexture = std::make_unique<Texture2D>(
+            nullptr, GL_FLOAT, _currentWidth, _currentHeight, GL_RGBA16F, GL_RGBA);
+        _outputDepth = std::make_unique<Texture2D>(
+            nullptr, GL_UNSIGNED_INT_24_8, _currentWidth, _currentHeight, GL_DEPTH24_STENCIL8, GL_DEPTH_STENCIL);
+        Texture2D* outputColorAttachments[] = { _outputTexture.get() };
+        _outputFBO = std::make_unique<Framebuffer>(
+            outputColorAttachments, 1, _outputDepth.get());
+        
+    // 更新主窗口尺寸
+        _width = _currentWidth;
+        _height = _currentHeight;
+    }
     
     void update() override {
         drawUI();
-        
-        glfwGetFramebufferSize(_window, &_width, &_height);
-        float aspect = float(_width) / float(_height);
+
+        int newWidth, newHeight;
+        glfwGetFramebufferSize(_window, &newWidth, &newHeight);
+    
+        // 如果窗口大小变化，重建 FBO
+        if (newWidth != _currentWidth || newHeight != _currentHeight) {
+            _currentWidth = newWidth;
+            _currentHeight = newHeight;
+            recreateGBuffer(); // 重建 G-Buffer 和 Output FBO
+        }
+    
+        float aspect = float(_currentWidth) / float(_currentHeight);
+
         
         glm::mat4 view = getCameraView();
         glm::mat4 proj = glm::perspective(glm::radians(60.0f), aspect, 1.0f, 10000.0f);
-        glm::mat4 lightVP = getLightViewProjection();
+        // glm::mat4 lightVP = getLightViewProjection();
+
+        float yawRad = glm::radians(_lightYaw);
+        float pitchRad = glm::radians(_lightPitch);
+        _lightDir = glm::normalize(glm::vec3(std::sin(yawRad) * std::sin(pitchRad),-std::cos(pitchRad),std::cos(yawRad) * std::sin(pitchRad)));
+
+        glm::vec3 center = _scene->getCenter();
+        float radius = _scene->getRadius() * 1.5f;
+        glm::vec3 lightPos = center - _lightDir * radius;
+        glm::mat4 lightView = glm::lookAt(lightPos, center, glm::vec3(0, 1, 0));
+        glm::mat4 lightProj = glm::ortho(-radius, radius, -radius, radius, 0.1f, radius * 3.0f);
+        glm::mat4 lightVP = lightProj * lightView;      
         
         gbufferPass(view, proj);
-        rsmBufferPass(view, lightVP);
+        rsmBufferPass(lightView, lightVP);
         shadingPass(view, lightVP);
         displayPass();
     }
