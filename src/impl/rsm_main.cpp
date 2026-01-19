@@ -120,9 +120,9 @@ private:
         }
         
         // 根据场景设置相机初始位置
-        _cameraTarget = _scene->getCenter();
-        _cameraDistance = _scene->getRadius() * 1.5f;
-        _cameraYaw=90.0f;
+        _cameraTarget = glm::vec3(0.8f,-0.1f,3.3f);
+        _cameraDistance =1.5f;
+        _cameraYaw=210.0f;
         _cameraPitch=10.0f;
     }
     
