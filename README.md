@@ -152,6 +152,11 @@ make
    - Albedo / Normal / Position：G-Buffer 内容（相机视角）
    - RSM Flux / RSM Normal / RSM Position：RSM Buffer 内容（光源视角）
 
+## 渲染结果
+| 关闭 RSM（仅直接光 + 硬阴影） | 开启 RSM（+ 间接光） |
+|:---------------------------:|:-------------------:|
+| ![关闭 RSM](https://github.com/xuehaonan27/rsm_impl/blob/main/%E6%B8%B2%E6%9F%93%E5%AF%B9%E6%AF%94_RSM%20Off.png) | ![开启 RSM](https://github.com/xuehaonan27/rsm_impl/blob/main/%E6%B8%B2%E6%9F%93%E5%AF%B9%E6%AF%94_RSM%20On.png) |
+
 ## 依赖
 
 - CMake 3.15+
