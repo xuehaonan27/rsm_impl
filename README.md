@@ -153,9 +153,21 @@ make
    - RSM Flux / RSM Normal / RSM Position：RSM Buffer 内容（光源视角）
 
 ## 渲染结果
-| 关闭 RSM（仅直接光 + 硬阴影） | 开启 RSM（+ 间接光） |
-|:---------------------------:|:-------------------:|
-| ![关闭 RSM](https://github.com/xuehaonan27/rsm_impl/blob/main/%E6%B8%B2%E6%9F%93%E5%AF%B9%E6%AF%94_RSM%20Off.png) | ![开启 RSM](https://github.com/xuehaonan27/rsm_impl/blob/main/%E6%B8%B2%E6%9F%93%E5%AF%B9%E6%AF%94_RSM%20On.png) |
+
+<table>
+  <tr>
+    <td align="center">关闭 RSM（仅直接光）</td>
+    <td align="center">开启 RSM（含间接光）</td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="https://github.com/xuehaonan27/rsm_impl/blob/main/%E6%B8%B2%E6%9F%93%E5%AF%B9%E6%AF%94_RSM%20Off.png" width="400" alt="RSM Off"/>
+    </td>
+    <td align="center">
+      <img src="https://github.com/xuehaonan27/rsm_impl/blob/main/%E6%B8%B2%E6%9F%93%E5%AF%B9%E6%AF%94_RSM%20On.png" width="400" alt="RSM On"/>
+    </td>
+  </tr>
+</table>
 
 ## 依赖
 
