@@ -121,10 +121,9 @@ data/shaders/rsm/
 ## 构建与运行
 
 ```bash
-mkdir build && cd build
-cmake ..
-make
-./rsm_impl
+cmake -B build
+cmake --build build
+./build/src/impl/rsm
 ```
 
 ### ImGui面板参数
