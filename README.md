@@ -127,30 +127,30 @@ make
 ./rsm_impl
 ```
 
-## ImGui面板参数
+### ImGui面板参数
 程序运行后，右上角将显示交互式控制面板，支持实时调节光源、相机、渲染模式及 RSM 参数
 ![ImGui面板](https://github.com/xuehaonan27/rsm_impl/blob/main/Imgui-Cutting.png)
-- 光源控制（Light）
-   **Yaw / Pitch**：调整平行光方向
-   **Color**：修改光源颜色
-- 相机控制（Camera）
-   **Yaw / Pitch**：轨道相机水平/垂直旋转
-   **Distance**：相机到目标点的距离（最小值 0.1，避免视图矩阵崩溃）
-   **Target**：相机的世界坐标（微调）
-- 渲染模式（Rendering Mode）
-   **Enable RSM**:
+#### 光源控制（Light）
+   - **Yaw / Pitch**：调整平行光方向
+   - **Color**：修改光源颜色
+#### 相机控制（Camera）
+   - **Yaw / Pitch**：轨道相机水平/垂直旋转
+   - **Distance**：相机到目标点的距离（最小值 0.1，避免视图矩阵崩溃）
+   - **Target**：相机的世界坐标（微调）
+#### 渲染模式（Rendering Mode）
+   - **Enable RSM**:
       开启：显示 *直接光 + 间接光*
       关闭：仅显示 *直接光*
-- RSM 参数（RSM Parameters）
-   **VPL Count**：参与间接光计算的虚拟点光源数量
-   **Sample Radius**：RSM 采样半径
-   **Indirect Strength**：间接光强度增益（范围：0.1 ~ 20.0）
+#### RSM 参数（RSM Parameters）
+   - **VPL Count**：参与间接光计算的虚拟点光源数量
+   - **Sample Radius**：RSM 采样半径
+   - **Indirect Strength**：间接光强度增益（范围：0.1 ~ 20.0）
    ⚠️ 当 RSM 关闭时，上述参数置灰无效。
--调试视图（Debug）
+#### 调试视图（Debug）
    切换显示模式，可视化中间缓冲区：
-   Final：最终渲染结果
-   Albedo / Normal / Position：G-Buffer 内容（相机视角）
-   RSM Flux / RSM Normal / RSM Position：RSM Buffer 内容（光源视角）
+   - Final：最终渲染结果
+   - Albedo / Normal / Position：G-Buffer 内容（相机视角）
+   - RSM Flux / RSM Normal / RSM Position：RSM Buffer 内容（光源视角）
 
 ## 依赖
 
