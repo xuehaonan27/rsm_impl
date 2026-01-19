@@ -138,13 +138,13 @@ make
    - **Distance**：相机到目标点的距离（最小值 0.1，避免视图矩阵崩溃）
    - **Target**：相机的世界坐标（微调）
 #### 渲染模式（Rendering Mode）
-   - **Enable RSM**:
-      开启：显示 *直接光 + 间接光*
+   - **Enable RSM**:<br>
+      开启：显示 *直接光 + 间接光*<br>
       关闭：仅显示 *直接光*
 #### RSM 参数（RSM Parameters）
    - **VPL Count**：参与间接光计算的虚拟点光源数量
    - **Sample Radius**：RSM 采样半径
-   - **Indirect Strength**：间接光强度增益（范围：0.1 ~ 20.0）
+   - **Indirect Strength**：间接光强度增益（范围：0.1 ~ 20.0）<br>
    ⚠️ 当 RSM 关闭时，上述参数置灰无效。
 #### 调试视图（Debug）
    切换显示模式，可视化中间缓冲区：
