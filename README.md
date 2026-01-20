@@ -128,7 +128,7 @@ cmake --build build
 
 ### ImGui面板参数
 程序运行后，右上角将显示交互式控制面板，支持实时调节光源、相机、渲染模式及 RSM 参数
-![ImGui面板](https://github.com/xuehaonan27/rsm_impl/blob/main/Imgui-Cutting.png)
+![ImGui面板](./Imgui-Cutting.png)
 #### 光源控制（Light）
    - **Yaw / Pitch**：调整平行光方向
    - **Color**：修改光源颜色
@@ -160,10 +160,10 @@ cmake --build build
   </tr>
   <tr>
     <td align="center">
-      <img src="https://github.com/xuehaonan27/rsm_impl/blob/main/%E6%B8%B2%E6%9F%93%E5%AF%B9%E6%AF%94_RSM%20Off.png" width="400" alt="RSM Off"/>
+      <img src="./Compare_RSM_Off.png" width="400" alt="RSM Off"/>
     </td>
     <td align="center">
-      <img src="https://github.com/xuehaonan27/rsm_impl/blob/main/%E6%B8%B2%E6%9F%93%E5%AF%B9%E6%AF%94_RSM%20On.png" width="400" alt="RSM On"/>
+      <img src="./Compare_RSM_On.png" width="400" alt="RSM On"/>
     </td>
   </tr>
 </table>
